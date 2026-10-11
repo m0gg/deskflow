@@ -109,3 +109,13 @@ body:
         - Did restarting Deskflow or the computer help?
         - Are the locales matching across all your systems?
         - Anything else you can think of?
+
+  - type: input
+    id: votes
+    attributes:
+      label: Have this issue yourself
+      description: Do not modify these instructions
+      value: |
+        React with :+1: if you have this issue. Only comment if you have new information to provide about the issue.
+    validations:
+      required: true
