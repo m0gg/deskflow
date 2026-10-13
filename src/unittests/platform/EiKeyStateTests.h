@@ -18,6 +18,8 @@ class EiKeyStateTests : public QObject
 private Q_SLOTS:
   void initTestCase();
   void clearStaleModifiers_shiftDownAndNumLockOn_shiftClearedAndNumLockPreserved();
+  void neoQwertz_serverSide_capsIsLevel3Shift_sIsSlash();
+  void neoQwertz_clientSide_capsAndS_injectsCapsAndSButtons();
   void updateLockedModifiers_compositorLockState_numLockFollowsCompositor();
 
 private:

@@ -359,6 +359,18 @@ void EiKeyState::updateLockedModifiers(xkb_mod_mask_t lockedMods)
   );
 }
 
+KeyButton EiKeyState::serverButtonToLocalButton(KeyButton serverButton) const
+{
+  // The Ei/Wayland backend receives evdev keycodes and adds 8 to form
+  // the XKB/X keycode that it sends over the wire as the originating
+  // button.  Our local KeyButtons are the raw evdev codes, so subtract
+  // the offset to point the tie-breaker at the same physical key.
+  if (serverButton >= 8) {
+    return static_cast<KeyButton>(serverButton - 8);
+  }
+  return 0;
+}
+
 void EiKeyState::clearStaleModifiers()
 {
   const auto lockedMods = xkb_state_serialize_mods(m_xkbState, XKB_STATE_MODS_LOCKED);

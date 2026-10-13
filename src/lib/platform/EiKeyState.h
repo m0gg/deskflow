@@ -37,6 +37,7 @@ public:
   void updateXkbState(std::uint32_t keyval, bool isPressed);
   void updateLockedModifiers(xkb_mod_mask_t lockedMods);
   void clearStaleModifiers() override;
+  KeyButton serverButtonToLocalButton(KeyButton serverButton) const override;
 
 protected:
   // KeyState overrides

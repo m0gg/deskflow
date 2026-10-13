@@ -214,7 +214,7 @@ public:
   */
   virtual const KeyItem *mapKey(
       Keystrokes &keys, KeyID id, int32_t group, ModifierToKeys &activeModifiers, KeyModifierMask &currentState,
-      KeyModifierMask desiredMask, bool isAutoRepeat, const std::string &lang
+      KeyModifierMask desiredMask, bool isAutoRepeat, const std::string &lang, KeyButton preferredButton = 0
   ) const;
 
   void setLanguageData(std::vector<std::string> layouts);
@@ -356,19 +356,22 @@ private:
   // used to do it.
   const KeyItem *mapCharacterKey(
       Keystrokes &keys, KeyID id, int32_t group, ModifierToKeys &activeModifiers, KeyModifierMask &currentState,
-      KeyModifierMask desiredMask, bool isAutoRepeat, const std::string &lang
+      KeyModifierMask desiredMask, bool isAutoRepeat, const std::string &lang, KeyButton preferredButton = 0
   ) const;
 
   // maps a modifier key
   const KeyItem *mapModifierKey(
       Keystrokes &keys, KeyID id, int32_t group, ModifierToKeys &activeModifiers, KeyModifierMask &currentState,
-      KeyModifierMask desiredMask, bool isAutoRepeat, const std::string &lang
+      KeyModifierMask desiredMask, bool isAutoRepeat, const std::string &lang, KeyButton preferredButton = 0
   ) const;
 
   // returns the index into \p entryList of the KeyItemList requiring
   // the fewest modifier changes between \p currentState and
-  // \p desiredState.
-  int32_t findBestKey(const KeyEntryList &entryList, KeyModifierMask desiredState) const;
+  // \p desiredState.  When several items match equally, the one whose
+  // physical button equals \p preferredButton (if any) is chosen, so a
+  // modifier key is faked with the same physical key the remote pressed
+  // (e.g. CAPS rather than another key that shares the modifier).
+  int32_t findBestKey(const KeyEntryList &entryList, KeyModifierMask desiredState, KeyButton preferredButton = 0) const;
 
   // gets the \c KeyItem used to synthesize the modifier who's bit is
   // given by \p modifierBit in group \p group and does not synthesize
@@ -425,7 +428,7 @@ private:
 
   int32_t getLanguageGroupID(int32_t group, const std::string &lang) const;
   const KeyItemList *
-  getKeyItemList(const KeyGroupTable &keyGroupTable, int32_t group, KeyModifierMask desiredMask) const;
+  getKeyItemList(const KeyGroupTable &keyGroupTable, int32_t group, KeyModifierMask desiredMask, KeyButton preferredButton = 0) const;
 
   // not implemented
   KeyMap(const KeyMap &);

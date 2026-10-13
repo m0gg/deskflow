@@ -226,7 +226,7 @@ void KeyMap::foreachKey(ForeachKeyCallback cb, void *userData)
 
 const KeyMap::KeyItem *KeyMap::mapKey(
     Keystrokes &keys, KeyID id, int32_t group, ModifierToKeys &activeModifiers, KeyModifierMask &currentState,
-    KeyModifierMask desiredMask, bool isAutoRepeat, const std::string &lang
+    KeyModifierMask desiredMask, bool isAutoRepeat, const std::string &lang, KeyButton preferredButton
 ) const
 {
   LOG(
@@ -259,7 +259,7 @@ const KeyMap::KeyItem *KeyMap::mapKey(
   case kKeyCapsLock:
   case kKeyNumLock:
   case kKeyScrollLock:
-    item = mapModifierKey(keys, id, group, activeModifiers, currentState, desiredMask, isAutoRepeat, lang);
+    item = mapModifierKey(keys, id, group, activeModifiers, currentState, desiredMask, isAutoRepeat, lang, preferredButton);
     break;
 
   case kKeySetModifiers:
@@ -282,7 +282,7 @@ const KeyMap::KeyItem *KeyMap::mapKey(
     if (isCommand(desiredMask)) {
       item = mapCommandKey(keys, id, group, activeModifiers, currentState, desiredMask, isAutoRepeat, lang);
     } else {
-      item = mapCharacterKey(keys, id, group, activeModifiers, currentState, desiredMask, isAutoRepeat, lang);
+      item = mapCharacterKey(keys, id, group, activeModifiers, currentState, desiredMask, isAutoRepeat, lang, preferredButton);
     }
     break;
   }
@@ -553,14 +553,14 @@ const KeyMap::KeyItem *KeyMap::mapCommandKey(
 }
 
 const KeyMap::KeyItemList *
-KeyMap::getKeyItemList(const KeyMap::KeyGroupTable &keyGroupTable, int32_t group, KeyModifierMask desiredMask) const
+KeyMap::getKeyItemList(const KeyMap::KeyGroupTable &keyGroupTable, int32_t group, KeyModifierMask desiredMask, KeyButton preferredButton) const
 {
   const KeyItemList *itemList = nullptr;
 
   // find best key in any group, starting with the active group
   for (int32_t groupOffset = 0; groupOffset < getNumGroups(); ++groupOffset) {
     const auto effectiveGroup = getEffectiveGroup(group, groupOffset);
-    auto keyIndex = findBestKey(keyGroupTable[effectiveGroup], desiredMask);
+    auto keyIndex = findBestKey(keyGroupTable[effectiveGroup], desiredMask, preferredButton);
     if (keyIndex != -1) {
       LOG_VERBOSE("found key in group %d", effectiveGroup);
       itemList = &keyGroupTable[effectiveGroup][keyIndex];
@@ -573,7 +573,7 @@ KeyMap::getKeyItemList(const KeyMap::KeyGroupTable &keyGroupTable, int32_t group
 
 const KeyMap::KeyItem *KeyMap::mapCharacterKey(
     Keystrokes &keys, KeyID id, int32_t group, ModifierToKeys &activeModifiers, KeyModifierMask &currentState,
-    KeyModifierMask desiredMask, bool isAutoRepeat, const std::string &lang
+    KeyModifierMask desiredMask, bool isAutoRepeat, const std::string &lang, KeyButton preferredButton
 ) const
 {
   // find KeySym in table
@@ -586,7 +586,7 @@ const KeyMap::KeyItem *KeyMap::mapCharacterKey(
   }
 
   // get keys to press for key
-  const auto itemList = getKeyItemList(i->second, getLanguageGroupID(group, lang), desiredMask);
+  const auto itemList = getKeyItemList(i->second, getLanguageGroupID(group, lang), desiredMask, preferredButton);
   if (!itemList || itemList->empty()) {
     // no mapping for this keysym
     LOG_VERBOSE("no mapping for key %04x", id);
@@ -631,14 +631,30 @@ void KeyMap::addGroupToKeystroke(Keystrokes &keys, int32_t &group, const std::st
 
 const KeyMap::KeyItem *KeyMap::mapModifierKey(
     Keystrokes &keys, KeyID id, int32_t group, ModifierToKeys &activeModifiers, KeyModifierMask &currentState,
-    KeyModifierMask desiredMask, bool isAutoRepeat, const std::string &lang
+    KeyModifierMask desiredMask, bool isAutoRepeat, const std::string &lang, KeyButton preferredButton
 ) const
 {
-  return mapCharacterKey(keys, id, group, activeModifiers, currentState, desiredMask, isAutoRepeat, lang);
+  return mapCharacterKey(keys, id, group, activeModifiers, currentState, desiredMask, isAutoRepeat, lang, preferredButton);
 }
 
-int32_t KeyMap::findBestKey(const KeyEntryList &entryList, KeyModifierMask desiredState) const
+int32_t KeyMap::findBestKey(const KeyEntryList &entryList, KeyModifierMask desiredState, KeyButton preferredButton) const
 {
+  // if the caller indicated a preferred physical key (the one the remote
+  // actually pressed) and it can accommodate the desiredState exactly,
+  // use it.  this keeps a modifier like CAPS mapped to CAPS on the
+  // receiving end instead of another key that happens to share the
+  // modifier (e.g. the Neo backslash level-3 key).
+  if (preferredButton != 0) {
+    for (int32_t i = 0; i < (int32_t)entryList.size(); ++i) {
+      const KeyItem &item = entryList[i].back();
+      if (item.m_button == preferredButton && (item.m_required & desiredState) == item.m_required &&
+          (item.m_required & desiredState) == (item.m_sensitive & desiredState)) {
+        LOG_VERBOSE("best key index %d of %d (preferred button %d)", i + 1, entryList.size(), preferredButton);
+        return i;
+      }
+    }
+  }
+
   // check for an item that can accommodate the desiredState exactly
   for (int32_t i = 0; i < (int32_t)entryList.size(); ++i) {
     const KeyItem &item = entryList[i].back();

@@ -119,6 +119,16 @@ protected:
   */
   virtual bool isIgnoredKey(KeyID key, KeyModifierMask mask) const;
 
+  //! Map the remote originating button to the local button space
+  /*!
+  Returns the local KeyButton that corresponds to the server button
+  serverButton, used as a tie-breaker when several local keys can
+  synthesize the same KeyID (so a modifier is faked with the same
+  physical key the remote pressed). Returns 0 when the backend has no
+  such correspondence, which leaves the selection unchanged.
+  */
+  virtual KeyButton serverButtonToLocalButton(KeyButton serverButton) const;
+
   //! Get button for a KeyID
   /*!
   Return the button mapped to key \p id in group \p group if any,

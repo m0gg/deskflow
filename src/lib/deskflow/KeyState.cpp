@@ -810,8 +810,10 @@ void KeyState::fakeKeyDown(KeyID id, KeyModifierMask mask, KeyButton serverID, c
 
   Keystrokes keys;
   ModifierToKeys oldActiveModifiers = m_activeModifiers;
-  const deskflow::KeyMap::KeyItem *keyItem =
-      m_keyMap.mapKey(keys, id, pollActiveGroup(), m_activeModifiers, getActiveModifiersRValue(), mask, false, lang);
+  const deskflow::KeyMap::KeyItem *keyItem = m_keyMap.mapKey(
+      keys, id, pollActiveGroup(), m_activeModifiers, getActiveModifiersRValue(), mask, false, lang,
+      serverButtonToLocalButton(serverID)
+  );
 
   if (keyItem == nullptr) {
     // a media key won't be mapped on mac, so we need to fake it in a
@@ -853,8 +855,10 @@ bool KeyState::fakeKeyRepeat(KeyID id, KeyModifierMask mask, int32_t count, KeyB
   // get keys for key repeat
   Keystrokes keys;
   ModifierToKeys oldActiveModifiers = m_activeModifiers;
-  const deskflow::KeyMap::KeyItem *keyItem =
-      m_keyMap.mapKey(keys, id, pollActiveGroup(), m_activeModifiers, getActiveModifiersRValue(), mask, true, lang);
+  const deskflow::KeyMap::KeyItem *keyItem = m_keyMap.mapKey(
+      keys, id, pollActiveGroup(), m_activeModifiers, getActiveModifiersRValue(), mask, true, lang,
+      serverButtonToLocalButton(serverID)
+  );
   if (keyItem == nullptr) {
     return false;
   }
@@ -991,6 +995,14 @@ bool KeyState::isIgnoredKey(KeyID key, KeyModifierMask) const
   default:
     return false;
   }
+}
+
+KeyButton KeyState::serverButtonToLocalButton(KeyButton) const
+{
+  // By default the backend has no known correspondence between the
+  // server's button numbering and our local button numbering, so no
+  // preference is applied and key selection is unchanged.
+  return 0;
 }
 
 KeyButton KeyState::getButton(KeyID id, int32_t group) const
