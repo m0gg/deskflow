@@ -5,7 +5,10 @@
 #     longer references evdev.xml.
 #   * the upstream postInstall docs (README.md, doc/user/configuration.md)
 #     do not exist in this fork.
-#   * tests are individual ctest tests now, not a single `legacytests` binary.
+#   * tests are individual ctest tests now, not a single `legacytests` binary:
+#     upstream's checkPhase runs ./bin/legacytests (which this fork does not
+#     build) and passes -DSKIP_BUILD_TESTS=ON, an option this fork renamed to
+#     BUILD_TESTS (default ON), so the checkPhase is replaced instead.
 #
 # Consumed by the nix-msca flake as input `deskflow-src` (nixpkgs follows the
 # consumer's nixpkgs there).
@@ -30,7 +33,8 @@
         in
         {
           default = pkgs.deskflow.overrideAttrs (finalAttrs: prevAttrs: {
-            version = "1.26.0-dev";
+            # src/CMakeLists.txt of this fork is at 1.27.0
+            version = "1.27.0-dev";
 
             src = self;
 
@@ -42,19 +46,18 @@
             # This fork ships no README.md / doc/user/configuration.md
             postInstall = "";
 
-            # WIP: EiKeyStateTests fails on the KeyMap/KeyState/EiKeyState
-            # changes in this fork (neoQwertz capsAndS tests), and the tests are
-            # an `ALL` cmake target that runs during the build itself. Skip them
-            # via the BUILD_TESTS cmake option; re-enable once the tests are
-            # green:
-            #   ctest --test-dir build -R EiKeyStateTests
-            cmakeFlags = (prevAttrs.cmakeFlags or [ ]) ++ [ "-DBUILD_TESTS=OFF" ];
-            doCheck = false;
-
+            # Run the individual ctest tests; upstream's `./bin/legacytests`
+            # binary is not built by this fork. checkPhase runs inside the cmake
+            # build dir and this fork only calls enable_testing() in
+            # src/unittests, hence the relative --test-dir below.
+            # The EiKeyState tests compile real xkb layouts (de/neo_qwertz);
+            # libxkbcommon has xkeyboard-config baked into its default include
+            # path, so they find it in the sandbox.
             checkPhase = ''
               runHook preCheck
               export QT_QPA_PLATFORM=offscreen
-              ctest --output-on-failure
+              ctest --test-dir src/unittests --output-on-failure \
+                --exclude-regex "OSX(KeyState|Clipboard)Tests"
               runHook postCheck
             '';
           });
