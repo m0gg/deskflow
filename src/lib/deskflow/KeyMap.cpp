@@ -259,7 +259,9 @@ const KeyMap::KeyItem *KeyMap::mapKey(
   case kKeyCapsLock:
   case kKeyNumLock:
   case kKeyScrollLock:
-    item = mapModifierKey(keys, id, group, activeModifiers, currentState, desiredMask, isAutoRepeat, lang, preferredButton);
+    item = mapModifierKey(
+        keys, id, group, activeModifiers, currentState, desiredMask, isAutoRepeat, lang, preferredButton
+    );
     break;
 
   case kKeySetModifiers:
@@ -280,9 +282,13 @@ const KeyMap::KeyItem *KeyMap::mapKey(
 
   default:
     if (isCommand(desiredMask)) {
-      item = mapCommandKey(keys, id, group, activeModifiers, currentState, desiredMask, isAutoRepeat, lang);
+      item = mapCommandKey(
+          keys, id, group, activeModifiers, currentState, desiredMask, isAutoRepeat, lang, preferredButton
+      );
     } else {
-      item = mapCharacterKey(keys, id, group, activeModifiers, currentState, desiredMask, isAutoRepeat, lang, preferredButton);
+      item = mapCharacterKey(
+          keys, id, group, activeModifiers, currentState, desiredMask, isAutoRepeat, lang, preferredButton
+      );
     }
     break;
   }
@@ -472,7 +478,7 @@ void KeyMap::setModifierKeys()
 
 const KeyMap::KeyItem *KeyMap::mapCommandKey(
     Keystrokes &keys, KeyID id, int32_t group, ModifierToKeys &activeModifiers, KeyModifierMask &currentState,
-    KeyModifierMask desiredMask, bool isAutoRepeat, const std::string &lang
+    KeyModifierMask desiredMask, bool isAutoRepeat, const std::string &lang, KeyButton preferredButton
 ) const
 {
   static const KeyModifierMask s_overrideModifiers = 0xffffu;
@@ -486,33 +492,58 @@ const KeyMap::KeyItem *KeyMap::mapCommandKey(
   }
   const KeyGroupTable &keyGroupTable = i->second;
 
+  // match based on shift and make sure all required modifiers,
+  // except shift, are already in the desired mask;  we're
+  // after the right button not the right character.
+  // we'll use desiredMask as-is, overriding the key's required
+  // modifiers, when synthesizing this button.
+  auto usable = [](const KeyItem &item, KeyModifierMask desiredMask) {
+    KeyModifierMask desiredShiftMask = KeyModifierShift & desiredMask;
+    KeyModifierMask requiredIgnoreShiftMask = item.m_required & ~KeyModifierShift;
+    return (item.m_required & desiredShiftMask) == (item.m_sensitive & desiredShiftMask) &&
+           ((requiredIgnoreShiftMask & desiredMask) == requiredIgnoreShiftMask);
+  };
+
   // find the first key that generates this KeyID
   const KeyItem *keyItem = nullptr;
   const auto numGroups = getNumGroups();
-  for (int32_t groupOffset = 0; groupOffset < numGroups; ++groupOffset) {
+  for (int32_t groupOffset = 0; groupOffset < numGroups && !keyItem; ++groupOffset) {
     const auto effectiveGroup = getEffectiveGroup(group, groupOffset);
     const KeyEntryList &entryList = keyGroupTable[effectiveGroup];
+
+    // prefer the physical key the remote actually pressed when it can be
+    // used with this modifier state.  mapCommandKey keeps the desired mask
+    // as-is, so without this the first entry of the KeyID wins and a key
+    // that only produces this KeyID in another level gets pressed with the
+    // wrong level (e.g. de(neo): '$' is on the X key at level 3, but the
+    // first entry for '$' is Shift+6 - pressing 6 with level 3 active
+    // yields 'cent').
+    if (preferredButton != 0) {
+      for (const auto &entry : entryList) {
+        if (entry.size() != 1) {
+          continue;
+        }
+        const auto &item = entry.back();
+        if (item.m_button == preferredButton && usable(item, desiredMask)) {
+          LOG_VERBOSE("found preferred key in group %d", effectiveGroup);
+          keyItem = &item;
+          break;
+        }
+      }
+    }
+
     for (const auto &entry : entryList) {
+      if (keyItem) {
+        break;
+      }
       if (entry.size() != 1) {
         continue;
       }
-      // match based on shift and make sure all required modifiers,
-      // except shift, are already in the desired mask;  we're
-      // after the right button not the right character.
-      // we'll use desiredMask as-is, overriding the key's required
-      // modifiers, when synthesizing this button.
       const auto &item = entry.back();
-      KeyModifierMask desiredShiftMask = KeyModifierShift & desiredMask;
-      KeyModifierMask requiredIgnoreShiftMask = item.m_required & ~KeyModifierShift;
-      if ((item.m_required & desiredShiftMask) == (item.m_sensitive & desiredShiftMask) &&
-          ((requiredIgnoreShiftMask & desiredMask) == requiredIgnoreShiftMask)) {
+      if (usable(item, desiredMask)) {
         LOG_VERBOSE("found key in group %d", effectiveGroup);
         keyItem = &item;
-        break;
       }
-    }
-    if (keyItem) {
-      break;
     }
   }
   if (!keyItem) {
@@ -552,8 +583,9 @@ const KeyMap::KeyItem *KeyMap::mapCommandKey(
   return keyItem;
 }
 
-const KeyMap::KeyItemList *
-KeyMap::getKeyItemList(const KeyMap::KeyGroupTable &keyGroupTable, int32_t group, KeyModifierMask desiredMask, KeyButton preferredButton) const
+const KeyMap::KeyItemList *KeyMap::getKeyItemList(
+    const KeyMap::KeyGroupTable &keyGroupTable, int32_t group, KeyModifierMask desiredMask, KeyButton preferredButton
+) const
 {
   const KeyItemList *itemList = nullptr;
 
@@ -634,10 +666,13 @@ const KeyMap::KeyItem *KeyMap::mapModifierKey(
     KeyModifierMask desiredMask, bool isAutoRepeat, const std::string &lang, KeyButton preferredButton
 ) const
 {
-  return mapCharacterKey(keys, id, group, activeModifiers, currentState, desiredMask, isAutoRepeat, lang, preferredButton);
+  return mapCharacterKey(
+      keys, id, group, activeModifiers, currentState, desiredMask, isAutoRepeat, lang, preferredButton
+  );
 }
 
-int32_t KeyMap::findBestKey(const KeyEntryList &entryList, KeyModifierMask desiredState, KeyButton preferredButton) const
+int32_t
+KeyMap::findBestKey(const KeyEntryList &entryList, KeyModifierMask desiredState, KeyButton preferredButton) const
 {
   // if the caller indicated a preferred physical key (the one the remote
   // actually pressed) and it can accommodate the desiredState exactly,

@@ -345,10 +345,13 @@ private:
   // not trying to synthesize a character.  so we just need to find the
   // right button and synthesize the requested modifiers without regard
   // to what character they would synthesize.  we disallow multikey
-  // entries since they don't make sense as hotkeys.
+  // entries since they don't make sense as hotkeys.  When several
+  // buttons can be used, the one matching \p preferredButton (the physical
+  // key the remote pressed) wins, so a level-shifting modifier like
+  // AltGr stays combined with the key the user actually hit.
   const KeyItem *mapCommandKey(
       Keystrokes &keys, KeyID id, int32_t group, ModifierToKeys &activeModifiers, KeyModifierMask &currentState,
-      KeyModifierMask desiredMask, bool isAutoRepeat, const std::string &lang
+      KeyModifierMask desiredMask, bool isAutoRepeat, const std::string &lang, KeyButton preferredButton = 0
   ) const;
 
   // maps a character key.  a character key is trying to synthesize a
@@ -427,8 +430,9 @@ private:
   void addGroupToKeystroke(Keystrokes &keys, int32_t &group, const std::string &lang) const;
 
   int32_t getLanguageGroupID(int32_t group, const std::string &lang) const;
-  const KeyItemList *
-  getKeyItemList(const KeyGroupTable &keyGroupTable, int32_t group, KeyModifierMask desiredMask, KeyButton preferredButton = 0) const;
+  const KeyItemList *getKeyItemList(
+      const KeyGroupTable &keyGroupTable, int32_t group, KeyModifierMask desiredMask, KeyButton preferredButton = 0
+  ) const;
 
   // not implemented
   KeyMap(const KeyMap &);
